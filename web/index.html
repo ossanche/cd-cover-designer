@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carátulas traseras CD/DVD · doble cara</title>
+<style>
+:root{--bg:#f2f2ef;--fg:#1d1d1d;--card:#fff;--bd:#d5d5cf;--ac:#0a7d70;--mut:#6b6b66;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#ececec;--card:#1f2226;--bd:#3a3f45;--ac:#3cc7b4;--mut:#9a9fa5}}
+:root[data-theme="dark"]{--bg:#15171a;--fg:#ececec;--card:#1f2226;--bd:#3a3f45;--ac:#3cc7b4;--mut:#9a9fa5}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font:13px system-ui,sans-serif}
+#app{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;background:var(--bg)}
+header{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--bd);align-items:center}
+header b{margin-right:6px}
+button,select,input,textarea{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:5px 9px}
+button{cursor:pointer}button:hover{border-color:var(--ac)}
+button.on,.tab.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+main{flex:1;display:flex;min-height:0}
+#stage{flex:1;overflow:auto;padding:24px}
+#hint{color:var(--mut);margin:0 0 12px}
+#sizer{position:relative}
+#rot{position:absolute;left:0;top:0;transform-origin:0 0}
+#wrap{position:absolute;left:0;top:0;transform-origin:0 0;box-shadow:0 0 0 1px var(--bd),0 6px 18px #0003}
+#cardEl{position:absolute;inset:0;overflow:hidden;touch-action:none}
+#ghost{position:absolute;inset:0;overflow:hidden;opacity:.3;transform:scaleX(-1);pointer-events:none}
+#guides{position:absolute;inset:0;pointer-events:none}
+.gz{position:absolute;border:.25mm dashed #1e90ff;box-sizing:border-box}
+.sel{outline:.4mm solid #ff9800;outline-offset:-.2mm}
+.hd{position:absolute;right:0;bottom:0;width:4mm;height:4mm;background:#ff9800;cursor:nwse-resize}
+aside{width:310px;overflow:auto;padding:10px;border-left:1px solid var(--bd)}
+.box{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:10px}
+.box h4{margin:0 0 8px;font-size:13px}
+.f{display:flex;flex-direction:column;gap:2px;margin-bottom:6px;font-size:12px}
+.f input,.f select,.f textarea{width:100%}
+.f:has(input[type=checkbox]){flex-direction:row;align-items:center;gap:6px}
+.f input[type=checkbox]{width:auto}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 8px}
+.btns{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.row{display:flex;align-items:center;gap:4px;padding:3px 6px;border:1px solid var(--bd);border-radius:5px;margin-bottom:3px;cursor:pointer;font-size:12px}
+.row.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 15%,transparent)}
+.row button{padding:0 6px;margin-left:auto}.row button+button{margin-left:0}
+small{color:var(--mut)}
+#proot{position:absolute;left:0;top:0;z-index:-1}
+.page{position:relative;background:#fff;overflow:hidden;break-after:page}
+@media (max-width:820px){main{flex-direction:column}aside{width:auto;max-height:48%;border-left:0;border-top:1px solid var(--bd)}}
+@media print{#app{display:none!important}html,body{overflow:visible;height:auto}#proot{position:static;z-index:auto}}
+</style>
+<style id="pg"></style>
+</head>
+<body>
+<div id="app">
+<header>
+  <b>Carátulas CD/DVD</b>
+  <button class="tab on" id="tA">Cara A · Exterior</button>
+  <button class="tab" id="tB">Cara B · Interior</button>
+  <button id="addT">+ Texto</button>
+  <button id="addI">+ Imagen</button>
+  <button id="addR">+ Forma</button>
+  <button id="addS">+ Texto de lomos</button>
+  <button id="addL">+ Lista de canciones</button>
+  <button id="vr">Girar vista 90°</button>
+  <label>Zoom <input type="range" id="zoom" min="50" max="300" value="120" style="padding:0"></label>
+  <input type="file" id="imgIn" accept="image/*" hidden>
+</header>
+<main>
+  <section id="stage"><p id="hint"></p><div id="sizer"><div id="rot"><div id="wrap"><div id="cardEl"></div><div id="ghost"></div><div id="guides"></div></div></div></div></section>
+  <aside>
+    <div class="box"><h4>Propiedades</h4><div id="props"></div></div>
+    <div class="box"><h4>Capas <small>(arriba = delante)</small></h4><div id="layers"></div></div>
+    <div class="box"><h4>Impresión dúplex</h4><div id="pr"></div>
+      <div class="btns"><button id="prn">Imprimir</button><button id="pdf" class="on">Descargar PDF</button></div>
+      <p><small>La Cara B se edita tal como se ve desde dentro. Al imprimir se coloca en el reverso, en posición espejada, para que coincida exactamente con la Cara A. En el diálogo de impresión: escala 100 %, sin márgenes ni encabezados, doble cara por el borde largo.</small></p>
+    </div>
+    <div class="box"><h4>Proyecto y plantilla</h4>
+      <div class="btns"><button id="sv">Guardar proyecto</button><button id="op">Abrir proyecto</button><button id="tp">Plantilla XML</button></div>
+      <input type="file" id="opIn" accept=".json" hidden><input type="file" id="tpIn" accept=".xml" hidden>
+      <p><small id="tinfo"></small></p>
+    </div>
+  </aside>
+</main>
+</div>
+<div id="proot"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const $=id=>document.getElementById(id),r1=v=>Math.round(v*10)/10;
+const DEF='<?xml version="1.0" encoding="UTF-8"?><plantilla unidad="mm" ancho="215.9" alto="297.01"><rect id="rect1" x="90.5" y="75" width="118" height="6.5"/><rect id="rect2" x="90.5" y="81.5" width="118" height="138.5"/><rect id="rect3" x="90.5" y="220" width="118" height="6.5"/></plantilla>';
+function tplFrom(xml){
+  const d=new DOMParser().parseFromString(xml,'application/xml');
+  const rs=[...d.getElementsByTagName('rect')].map(r=>['x','y','width','height'].map(k=>parseFloat(r.getAttribute(k))));
+  if(!rs.length||rs.flat().some(isNaN))throw new Error('El XML no contiene rectángulos válidos');
+  const x0=Math.min(...rs.map(r=>r[0])),y0=Math.min(...rs.map(r=>r[1]));
+  return{w:r1(Math.max(...rs.map(r=>r[0]+r[2]))-x0),h:r1(Math.max(...rs.map(r=>r[1]+r[3]))-y0),
+    zones:rs.map(r=>({x:r1(r[0]-x0),y:r1(r[1]-y0),w:r[2],h:r[3]})).sort((a,b)=>a.y-b.y||a.x-b.x)};
+}
+const fresh=()=>({tpl:tplFrom(DEF),ghost:true,sides:{A:{bg:'#ffffff',els:[]},B:{bg:'#ffffff',els:[]}},
+  print:{paper:'A4',flip:'long',which:'both',ox:0,oy:0,bdx:0,bdy:0,marks:true,marksB:false}});
+let S=fresh();
+try{const t=JSON.parse(localStorage.getItem('cdcover4'));if(t&&t.tpl&&t.sides){S=Object.assign(fresh(),t);S.print=Object.assign(fresh().print,t.print)}}catch(e){}
+let side='A',sel=null,z=1.2,vr=0,st;
+const cur=()=>S.sides[side],mainZ=()=>S.tpl.zones.reduce((a,b)=>b.w*b.h>a.w*a.h?b:a);
+const save=()=>{clearTimeout(st);st=setTimeout(()=>{try{localStorage.setItem('cdcover4',JSON.stringify(S))}catch(e){}},400)};
+const uid=()=>Math.random().toString(36).slice(2,8);
+const FONTS=['Arial','Verdana','Trebuchet MS','Georgia','Times New Roman','Courier New','Impact','Comic Sans MS'].map(f=>[f,f]);
+
+/* ---------- elementos ---------- */
+function mk(e,edit){
+  const d=document.createElement('div'),s=d.style;
+  Object.assign(s,{position:'absolute',left:e.x+'mm',top:e.y+'mm',width:e.w+'mm',height:e.h+'mm',transform:`rotate(${e.rot}deg)`,opacity:e.op/100,boxSizing:'border-box'});
+  if(e.type==='rect'){s.background=e.fill;if(e.sw)s.border=`${e.sw}mm solid ${e.stroke}`}
+  if(e.type==='image'){s.backgroundImage=`url("${e.src}")`;s.backgroundSize=e.fit==='fill'?'100% 100%':e.fit;s.backgroundPosition='center';s.backgroundRepeat='no-repeat'}
+  if(e.type==='text'){
+    Object.assign(s,{display:'flex',flexDirection:'column',justifyContent:{top:'flex-start',middle:'center',bottom:'flex-end'}[e.valign],
+      fontFamily:e.font,fontSize:e.size+'pt',color:e.color,fontWeight:e.bold?700:400,fontStyle:e.italic?'italic':'normal',
+      lineHeight:e.lh,textAlign:e.align,whiteSpace:'pre-wrap',wordBreak:'break-word'});
+    d.textContent=e.text;
+  }
+  if(edit){d.dataset.id=e.id;if(e.id===sel){d.classList.add('sel');const h=document.createElement('div');h.className='hd';d.append(h)}}
+  return d;
+}
+function fill(host,sd,edit,ghost){host.innerHTML='';if(!ghost)host.style.background=sd.bg;sd.els.forEach(e=>host.append(mk(e,edit)))}
+function add(e){e.id=uid();e.rot=e.rot||0;e.op=100;cur().els.push(e);sel=e.id;card();props();save()}
+
+/* ---------- editor ---------- */
+function card(){
+  const t=S.tpl,K=96/25.4*z,pw=t.w*K,ph=t.h*K;
+  Object.assign($('wrap').style,{width:t.w+'mm',height:t.h+'mm',transform:`scale(${z})`});
+  $('sizer').style.width=(vr?ph:pw)+'px';$('sizer').style.height=(vr?pw:ph)+'px';
+  Object.assign($('rot').style,{width:pw+'px',height:ph+'px',transform:vr?`translateY(${pw}px) rotate(-90deg)`:'none'});
+  fill($('cardEl'),cur(),true);
+  $('ghost').style.display=S.ghost?'block':'none';
+  if(S.ghost)fill($('ghost'),S.sides[side==='A'?'B':'A'],false,true);
+  $('guides').innerHTML=t.zones.map(q=>`<div class="gz" style="left:${q.x}mm;top:${q.y}mm;width:${q.w}mm;height:${q.h}mm"></div>`).join('');
+  $('tinfo').textContent=`Plantilla: ${t.w} × ${t.h} mm · ${t.zones.length} zonas`;
+  layers();
+}
+function layers(){
+  const L=$('layers');L.innerHTML='';
+  [...cur().els].reverse().forEach(e=>{
+    const r=document.createElement('div');r.className='row'+(e.id===sel?' on':'');
+    r.append(e.type==='text'?'T · '+e.text.slice(0,20):e.type==='image'?'Imagen':'Forma');
+    r.onclick=()=>{sel=e.id;card();props()};
+    [['▲',1],['▼',-1]].forEach(([t,dl])=>{const b=document.createElement('button');b.textContent=t;
+      b.onclick=ev=>{ev.stopPropagation();const a=cur().els,i=a.indexOf(e),j=i+dl;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];card();save()};r.append(b)});
+    L.append(r);
+  });
+  if(!cur().els.length)L.innerHTML='<small>Sin elementos todavía</small>';
+}
+function fld(o,lab,k,type,opt,cb){
+  const l=document.createElement('label');l.className='f';const s=document.createElement('span');s.textContent=lab;l.append(s);let i;
+  if(type==='select'){i=document.createElement('select');opt.forEach(([v,t])=>i.add(new Option(t,v)))}
+  else if(type==='area'){i=document.createElement('textarea');i.rows=4}
+  else{i=document.createElement('input');i.type=type;if(type==='number')i.step=opt||.5}
+  if(type==='checkbox')i.checked=!!o[k];else i.value=o[k];
+  i.oninput=()=>{o[k]=type==='checkbox'?i.checked:type==='number'?(parseFloat(i.value)||0):i.value;(cb||card)();save()};
+  l.append(i);if(type==='checkbox')l.prepend(i);return l;
+}
+function props(){
+  const P=$('props');P.innerHTML='';const e=cur().els.find(x=>x.id===sel);
+  if(!e){P.append(fld(cur(),'Color de fondo de la Cara '+side,'bg','color'),fld(S,'Ver la otra cara en transparencia (espejada)','ghost','checkbox'));
+    P.insertAdjacentHTML('beforeend','<small>Pulsa un elemento para editarlo. Arrastra para mover y usa el cuadro naranja para cambiar el tamaño. Suprimir lo borra y las flechas lo mueven.</small>');return}
+  const B=(t,fn)=>{const b=document.createElement('button');b.textContent=t;b.onclick=fn;return b};
+  if(e.type==='text')P.append(fld(e,'Texto','text','area'),fld(e,'Fuente','font','select',FONTS),fld(e,'Tamaño (pt)','size','number',.5),fld(e,'Color','color','color'),
+    fld(e,'Negrita','bold','checkbox'),fld(e,'Cursiva','italic','checkbox'),fld(e,'Alineación','align','select',[['left','Izquierda'],['center','Centro'],['right','Derecha']]),
+    fld(e,'Vertical','valign','select',[['top','Arriba'],['middle','Centro'],['bottom','Abajo']]),fld(e,'Interlineado','lh','number',.05));
+  if(e.type==='rect')P.append(fld(e,'Relleno','fill','color'),fld(e,'Color del borde','stroke','color'),fld(e,'Grosor del borde (mm)','sw','number',.1));
+  if(e.type==='image'){P.append(fld(e,'Ajuste','fit','select',[['cover','Rellenar (recorta)'],['contain','Contener'],['fill','Estirar']]));
+    const q=document.createElement('div');q.className='btns';
+    q.append(B('Rellenar tarjeta',()=>{Object.assign(e,{x:0,y:0,w:S.tpl.w,h:S.tpl.h,rot:0});card();props();save()}),
+      B('Rellenar panel principal',()=>{const m=mainZ();Object.assign(e,{x:m.x,y:m.y,w:m.w,h:m.h,rot:0});card();props();save()}));P.append(q)}
+  const g=document.createElement('div');g.className='g2';
+  [['X (mm)','x'],['Y (mm)','y'],['Ancho','w'],['Alto','h'],['Giro (°)','rot'],['Opacidad %','op']].forEach(([a,k])=>g.append(fld(e,a,k,'number',k==='rot'?1:.5)));
+  P.append(g);
+  const turn=a=>{const cx=e.x+e.w/2,cy=e.y+e.h/2;[e.w,e.h]=[e.h,e.w];e.x=r1(cx-e.w/2);e.y=r1(cy-e.h/2);e.rot=(e.rot+a+360)%360;card();props();save()};
+  const q=document.createElement('div');q.className='btns';
+  q.append(B('↺ 90°',()=>turn(-90)),B('↻ 90°',()=>turn(90)),B('Duplicar',()=>add({...e,x:e.x+3,y:e.y+3})),B('Borrar',del));
+  P.append(q);
+}
+function del(){const a=cur().els,i=a.findIndex(x=>x.id===sel);if(i>=0)a.splice(i,1);sel=null;card();props();save()}
+
+/* arrastrar y redimensionar */
+$('cardEl').onpointerdown=e=>{
+  const d=e.target.closest('[data-id]');
+  if(!d){sel=null;card();props();return}
+  sel=d.dataset.id;const el=cur().els.find(x=>x.id===sel),hd=e.target.classList.contains('hd');
+  const K=96/25.4*z,sx=e.clientX,sy=e.clientY,o={...el},host=$('cardEl');
+  host.setPointerCapture(e.pointerId);card();
+  host.onpointermove=ev=>{
+    let dx=(ev.clientX-sx)/K,dy=(ev.clientY-sy)/K;if(vr)[dx,dy]=[-dy,dx];
+    if(hd){
+      const a=o.rot*Math.PI/180,c=Math.cos(a),s=Math.sin(a),lx=dx*c+dy*s,ly=-dx*s+dy*c;
+      const w=Math.max(2,o.w+lx),h=Math.max(2,o.h+ly),mx=(w-o.w)/2,my=(h-o.h)/2;
+      const cx=o.x+o.w/2+mx*c-my*s,cy=o.y+o.h/2+mx*s+my*c;
+      Object.assign(el,{w,h,x:cx-w/2,y:cy-h/2});
+    }else{el.x=o.x+dx;el.y=o.y+dy}
+    card();
+  };
+  host.onpointerup=()=>{host.onpointermove=null;['x','y','w','h'].forEach(k=>el[k]=r1(el[k]));card();props();save()};
+};
+document.onkeydown=ev=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)||!sel)return;
+  const el=cur().els.find(x=>x.id===sel),n=ev.shiftKey?5:.5;
+  if(ev.key==='Delete'||ev.key==='Backspace')return del();
+  const m={ArrowLeft:['x',-n],ArrowRight:['x',n],ArrowUp:['y',-n],ArrowDown:['y',n]}[ev.key];
+  if(m&&el){ev.preventDefault();el[m[0]]=r1(el[m[0]]+m[1]);card();props();save()}
+};
+
+/* ---------- barra superior ---------- */
+function setSide(s){side=s;sel=null;$('tA').classList.toggle('on',s==='A');$('tB').classList.toggle('on',s==='B');
+  $('hint').textContent=s==='A'?'Cara A: lo que se ve desde el exterior de la carcasa.':'Cara B: lo que se ve desde el interior, al abrir la carcasa. Se edita tal como la verás; al imprimir se coloca espejada en el reverso.';
+  card();props()}
+$('tA').onclick=()=>setSide('A');$('tB').onclick=()=>setSide('B');
+$('zoom').oninput=e=>{z=e.target.value/100;card()};
+$('vr').onclick=()=>{vr=vr?0:1;$('vr').classList.toggle('on',!!vr);card()};
+$('addT').onclick=()=>{const m=mainZ();add({type:'text',x:m.x+5,y:m.y+5,w:m.w-10,h:20,text:'Texto',font:'Arial',size:10,color:'#000000',bold:false,italic:false,align:'left',valign:'top',lh:1.2})};
+$('addR').onclick=()=>{const m=mainZ();add({type:'rect',x:m.x,y:m.y,w:m.w,h:30,fill:'#222222',stroke:'#000000',sw:0})};
+$('addS').onclick=()=>{const zs=S.tpl.zones,a=zs[0],b=zs[zs.length-1],base={type:'text',font:'Arial',size:7,color:'#000000',bold:true,italic:false,align:'center',valign:'middle',lh:1.1,text:'ARTISTA · TÍTULO DEL DISCO'};
+  add({...base,x:a.x,y:a.y,w:a.w,h:a.h});if(zs.length>1)add({...base,x:b.x,y:b.y,w:b.w,h:b.h,rot:180})};
+$('addL').onclick=()=>{const m=mainZ();add({type:'text',x:m.x+5,y:m.y+5,w:m.w-10,h:m.h-10,text:Array.from({length:12},(_,i)=>`${i+1}. Título de la canción`).join('\n'),font:'Arial',size:8,color:'#000000',bold:false,italic:false,align:'left',valign:'top',lh:1.3})};
+$('addI').onclick=()=>$('imgIn').click();
+$('imgIn').onchange=ev=>{
+  const f=ev.target.files[0];ev.target.value='';if(!f)return;
+  const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{
+    const k=Math.min(1,2400/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);const m=mainZ();
+    add({type:'image',x:m.x,y:m.y,w:m.w,h:m.h,fit:'cover',src:c.toDataURL(/png/.test(f.type)?'image/png':'image/jpeg',.9)});
+  };im.src=rd.result};rd.readAsDataURL(f);
+};
+
+/* ---------- impresión ---------- */
+const PAPER={A4:[210,297],Carta:[215.9,279.4]};
+function printUI(){
+  const R=$('pr'),p=S.print,n=()=>0;R.innerHTML='';
+  R.append(fld(p,'Papel','paper','select',[['A4','A4'],['Carta','Carta']],n),
+    fld(p,'Volteo del dúplex','flip','select',[['long','Borde largo (lo habitual)'],['short','Borde corto']],n),
+    fld(p,'Imprimir','which','select',[['both','Ambas caras'],['A','Solo Cara A'],['B','Solo Cara B']],n));
+  const g=document.createElement('div');g.className='g2';
+  g.append(fld(p,'Mover X (mm)','ox','number',.5,n),fld(p,'Mover Y (mm)','oy','number',.5,n),fld(p,'Ajuste B en X','bdx','number',.1,n),fld(p,'Ajuste B en Y','bdy','number',.1,n));
+  R.append(g,fld(p,'Marcas de corte y doblez (Cara A)','marks','checkbox',0,n),fld(p,'Marcas también en Cara B','marksB','checkbox',0,n));
+}
+function build(){
+  const p=S.print,[W,H]=PAPER[p.paper],t=S.tpl,px=(W-t.w)/2+p.ox,py=(H-t.h)/2+p.oy,root=$('proot');root.innerHTML='';
+  $('pg').textContent=`@page{size:${W}mm ${H}mm;margin:0}`;
+  const marks=(x,y,inner)=>{
+    const L=(l,tp,w,h)=>{const d=document.createElement('div');d.style.cssText=`position:absolute;background:#000;left:${l}mm;top:${tp}mm;width:${w}mm;height:${h}mm`;inner.append(d)},T=.15,g=1.5,n=4;
+    [[x,y,-1,-1],[x+t.w,y,1,-1],[x,y+t.h,-1,1],[x+t.w,y+t.h,1,1]].forEach(([cx,cy,sx,sy])=>{
+      L(sx>0?cx+g:cx-g-n,cy-T/2,n,T);L(cx-T/2,sy>0?cy+g:cy-g-n,T,n)});
+    t.zones.forEach(q=>{if(q.y>0.5&&q.y<t.h-.5){L(x-g-n,y+q.y-T/2,n,T);L(x+t.w+g,y+q.y-T/2,n,T)}});
+  };
+  const page=(sd,x,y,mk2,rotate)=>{
+    const pg=document.createElement('div');pg.className='page';pg.style.cssText=`width:${W}mm;height:${H}mm`;
+    const inner=document.createElement('div');inner.style.cssText=`position:absolute;inset:0;${rotate?'transform:rotate(180deg)':''}`;
+    const c=document.createElement('div');c.style.cssText=`position:absolute;left:${x}mm;top:${y}mm;width:${t.w}mm;height:${t.h}mm;overflow:hidden`;
+    fill(c,sd);inner.append(c);if(mk2)marks(x,y,inner);pg.append(inner);root.append(pg);
+  };
+  if(p.which!=='B')page(S.sides.A,px,py,p.marks,false);
+  if(p.which!=='A')page(S.sides.B,W-px-t.w+p.bdx,py+p.bdy,p.marksB,p.flip==='short');
+  return [W,H];
+}
+$('prn').onclick=()=>{build();setTimeout(()=>{try{window.print()}catch(e){alert('No se pudo abrir el diálogo de impresión aquí. Usa «Descargar PDF» e imprime el PDF.')}},200)};
+$('pdf').onclick=async()=>{
+  const b=$('pdf'),txt=b.textContent;b.textContent='Generando…';b.disabled=true;
+  try{
+    const [W,H]=build(),doc=new window.jspdf.jsPDF({unit:'mm',format:[W,H],orientation:'p'});
+    const pgs=[...$('proot').querySelectorAll('.page')];
+    for(let i=0;i<pgs.length;i++){
+      const c=await html2canvas(pgs[i],{scale:3,backgroundColor:'#ffffff',windowWidth:900,windowHeight:2500,scrollX:0,scrollY:0});
+      if(i)doc.addPage([W,H],'p');
+      doc.addImage(c.toDataURL('image/jpeg',.95),'JPEG',0,0,W,H);
+    }
+    doc.save('caratula-trasera.pdf');
+  }catch(e){alert('No se pudo crear el PDF: '+e.message)}
+  b.textContent=txt;b.disabled=false;
+};
+
+/* ---------- proyecto y plantilla ---------- */
+function dl(n,t,m){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:m}));a.download=n;a.click()}
+$('sv').onclick=()=>dl('proyecto-caratula.json',JSON.stringify(S),'application/json');
+$('op').onclick=()=>$('opIn').click();$('tp').onclick=()=>$('tpIn').click();
+const rdTxt=(inp,fn)=>{const f=inp.files[0];inp.value='';if(!f)return;const r=new FileReader();r.onload=()=>{try{fn(r.result)}catch(e){alert(e.message)}};r.readAsText(f)};
+$('opIn').onchange=e=>rdTxt(e.target,t=>{const o=JSON.parse(t);if(!o.tpl||!o.sides)throw new Error('Proyecto no válido');S=Object.assign(fresh(),o);S.print=Object.assign(fresh().print,o.print);sel=null;printUI();card();props();save()});
+$('tpIn').onchange=e=>rdTxt(e.target,t=>{S.tpl=tplFrom(t);card();save()});
+
+printUI();setSide('A');
+</script>
+</body>
+</html>
