@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -41,6 +42,7 @@ aside{width:310px;overflow:auto;padding:10px;border-left:1px solid var(--bd)}
 .row.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 15%,transparent)}
 .row button{padding:0 6px;margin-left:auto}.row button+button{margin-left:0}
 small{color:var(--mut)}
+.gl{position:absolute;left:.6mm;top:.4mm;font:2.6mm/1 system-ui;color:#1e90ff;white-space:nowrap}
 #proot{position:absolute;left:0;top:0;z-index:-1}
 .page{position:relative;background:#fff;overflow:hidden;break-after:page}
 @media (max-width:820px){main{flex-direction:column}aside{width:auto;max-height:48%;border-left:0;border-top:1px solid var(--bd)}}
@@ -60,6 +62,7 @@ small{color:var(--mut)}
   <button id="addS">+ Texto de lomos</button>
   <button id="addL">+ Lista de canciones</button>
   <button id="vr">Girar vista 90°</button>
+  <button id="cal">Modo calibración</button>
   <label>Zoom <input type="range" id="zoom" min="50" max="300" value="120" style="padding:0"></label>
   <input type="file" id="imgIn" accept="image/*" hidden>
 </header>
@@ -68,6 +71,7 @@ small{color:var(--mut)}
   <aside>
     <div class="box"><h4>Propiedades</h4><div id="props"></div></div>
     <div class="box"><h4>Capas <small>(arriba = delante)</small></h4><div id="layers"></div></div>
+    <div class="box" id="calbox" style="display:none"><h4>Modo calibración</h4><div id="calui"></div></div>
     <div class="box"><h4>Impresión dúplex</h4><div id="pr"></div>
       <div class="btns"><button id="prn">Imprimir</button><button id="pdf" class="on">Descargar PDF</button></div>
       <p><small>La Cara B se edita tal como se ve desde dentro. Al imprimir se coloca en el reverso, en posición espejada, para que coincida exactamente con la Cara A. En el diálogo de impresión: escala 100 %, sin márgenes ni encabezados, doble cara por el borde largo.</small></p>
@@ -95,10 +99,10 @@ function tplFrom(xml){
     zones:rs.map(r=>({x:r1(r[0]-x0),y:r1(r[1]-y0),w:r[2],h:r[3]})).sort((a,b)=>a.y-b.y||a.x-b.x)};
 }
 const fresh=()=>({tpl:tplFrom(DEF),ghost:true,sides:{A:{bg:'#ffffff',els:[]},B:{bg:'#ffffff',els:[]}},
-  print:{paper:'A4',flip:'long',which:'both',ox:0,oy:0,bdx:0,bdy:0,marks:true,marksB:false}});
+  print:{paper:'A4',flip:'long',which:'both',ox:0,oy:0,bx:0,by:0,sx:100,sy:100,marks:true,marksB:false}});
 let S=fresh();
 try{const t=JSON.parse(localStorage.getItem('cdcover4'));if(t&&t.tpl&&t.sides){S=Object.assign(fresh(),t);S.print=Object.assign(fresh().print,t.print)}}catch(e){}
-let side='A',sel=null,z=1.2,vr=0,st;
+let side='A',sel=null,z=1.2,vr=0,st,calOn=false;
 const cur=()=>S.sides[side],mainZ=()=>S.tpl.zones.reduce((a,b)=>b.w*b.h>a.w*a.h?b:a);
 const save=()=>{clearTimeout(st);st=setTimeout(()=>{try{localStorage.setItem('cdcover4',JSON.stringify(S))}catch(e){}},400)};
 const uid=()=>Math.random().toString(36).slice(2,8);
@@ -131,7 +135,7 @@ function card(){
   fill($('cardEl'),cur(),true);
   $('ghost').style.display=S.ghost?'block':'none';
   if(S.ghost)fill($('ghost'),S.sides[side==='A'?'B':'A'],false,true);
-  $('guides').innerHTML=t.zones.map(q=>`<div class="gz" style="left:${q.x}mm;top:${q.y}mm;width:${q.w}mm;height:${q.h}mm"></div>`).join('');
+  $('guides').innerHTML=t.zones.map(q=>`<div class="gz" style="left:${q.x}mm;top:${q.y}mm;width:${q.w}mm;height:${q.h}mm">${calOn?`<span class="gl">${q.w} × ${q.h} mm</span>`:''}</div>`).join('');
   $('tinfo').textContent=`Plantilla: ${t.w} × ${t.h} mm · ${t.zones.length} zonas`;
   layers();
 }
@@ -236,10 +240,10 @@ function printUI(){
     fld(p,'Volteo del dúplex','flip','select',[['long','Borde largo (lo habitual)'],['short','Borde corto']],n),
     fld(p,'Imprimir','which','select',[['both','Ambas caras'],['A','Solo Cara A'],['B','Solo Cara B']],n));
   const g=document.createElement('div');g.className='g2';
-  g.append(fld(p,'Mover X (mm)','ox','number',.5,n),fld(p,'Mover Y (mm)','oy','number',.5,n),fld(p,'Ajuste B en X','bdx','number',.1,n),fld(p,'Ajuste B en Y','bdy','number',.1,n));
+  g.append(fld(p,'Mover X (mm)','ox','number',.5,n),fld(p,'Mover Y (mm)','oy','number',.5,n));
   R.append(g,fld(p,'Marcas de corte y doblez (Cara A)','marks','checkbox',0,n),fld(p,'Marcas también en Cara B','marksB','checkbox',0,n));
 }
-function build(){
+function build(mode){
   const p=S.print,[W,H]=PAPER[p.paper],t=S.tpl,px=(W-t.w)/2+p.ox,py=(H-t.h)/2+p.oy,root=$('proot');root.innerHTML='';
   $('pg').textContent=`@page{size:${W}mm ${H}mm;margin:0}`;
   const marks=(x,y,inner)=>{
@@ -248,40 +252,88 @@ function build(){
       L(sx>0?cx+g:cx-g-n,cy-T/2,n,T);L(cx-T/2,sy>0?cy+g:cy-g-n,T,n)});
     t.zones.forEach(q=>{if(q.y>0.5&&q.y<t.h-.5){L(x-g-n,y+q.y-T/2,n,T);L(x+t.w+g,y+q.y-T/2,n,T)}});
   };
-  const page=(sd,x,y,mk2,rotate)=>{
-    const pg=document.createElement('div');pg.className='page';pg.style.cssText=`width:${W}mm;height:${H}mm`;
-    const inner=document.createElement('div');inner.style.cssText=`position:absolute;inset:0;${rotate?'transform:rotate(180deg)':''}`;
-    const c=document.createElement('div');c.style.cssText=`position:absolute;left:${x}mm;top:${y}mm;width:${t.w}mm;height:${t.h}mm;overflow:hidden`;
-    fill(c,sd);inner.append(c);if(mk2)marks(x,y,inner);pg.append(inner);root.append(pg);
+  const calib=(x,y,inner,isB)=>{
+    const col=isB?'#e00000':'#000',us=[0,t.w/2,t.w],vs=[...new Set([0,t.h,...t.zones.flatMap(q=>[r1(q.y),r1(q.y+q.h)])])];
+    const L=(l,tp,w,h)=>{const d=document.createElement('div');d.style.cssText=`position:absolute;background:${col};left:${l}mm;top:${tp}mm;width:${w}mm;height:${h}mm`;inner.append(d)};
+    us.forEach(u=>vs.forEach(v=>{const cx=x+(isB?t.w-u:u),cy=y+v;L(cx-3,cy-.05,6,.1);L(cx-.05,cy-3,.1,6)}));
+    const lb=document.createElement('div');lb.style.cssText=`position:absolute;left:10mm;top:8mm;font:9pt Arial;color:${col}`;
+    lb.textContent=`CALIBRACIÓN · ${isB?'Cara B (rojo)':'Cara A (negro)'} · cruces exteriores: ${t.w} × ${t.h} mm`;inner.append(lb);
   };
-  if(p.which!=='B')page(S.sides.A,px,py,p.marks,false);
-  if(p.which!=='A')page(S.sides.B,W-px-t.w+p.bdx,py+p.bdy,p.marksB,p.flip==='short');
+  const page=(sd,x,y,mk2,rotate,tx,ty,cal)=>{
+    const pg=document.createElement('div');pg.className='page';pg.style.cssText=`width:${W}mm;height:${H}mm`;
+    const inner=document.createElement('div');inner.style.cssText=`position:absolute;inset:0;transform:translate(${tx||0}mm,${ty||0}mm) scale(${p.sx/100},${p.sy/100}) ${rotate?'rotate(180deg)':''}`;
+    const c=document.createElement('div');c.style.cssText=`position:absolute;left:${x}mm;top:${y}mm;width:${t.w}mm;height:${t.h}mm;overflow:hidden`;
+    if(cal)calib(x,y,inner,cal==='B');else fill(c,sd);inner.append(c);if(mk2)marks(x,y,inner);pg.append(inner);root.append(pg);
+  };
+  const LF=p.flip==='long',cal=mode==='cal',tx=LF?-p.bx:p.bx,ty=LF?p.by:-p.by;
+  if(cal||p.which!=='B')page(S.sides.A,px,py,!cal&&p.marks,false,0,0,cal&&'A');
+  if(cal||p.which!=='A')page(S.sides.B,W-px-t.w,py,!cal&&p.marksB,!LF,tx,ty,cal&&'B');
   return [W,H];
 }
-$('prn').onclick=()=>{build();setTimeout(()=>{try{window.print()}catch(e){alert('No se pudo abrir el diálogo de impresión aquí. Usa «Descargar PDF» e imprime el PDF.')}},200)};
-$('pdf').onclick=async()=>{
-  const b=$('pdf'),txt=b.textContent;b.textContent='Generando…';b.disabled=true;
+const doPrint=m=>{build(m);setTimeout(()=>{try{window.print()}catch(e){alert('No se pudo abrir el diálogo de impresión aquí. Usa «Descargar PDF» e imprime el PDF.')}},200)};
+$('prn').onclick=()=>doPrint();
+const doPdf=async(m,b)=>{
+  const txt=b.textContent;b.textContent='Generando…';b.disabled=true;
   try{
-    const [W,H]=build(),doc=new window.jspdf.jsPDF({unit:'mm',format:[W,H],orientation:'p'});
+    const [W,H]=build(m),doc=new window.jspdf.jsPDF({unit:'mm',format:[W,H],orientation:'p'});
     const pgs=[...$('proot').querySelectorAll('.page')];
     for(let i=0;i<pgs.length;i++){
       const c=await html2canvas(pgs[i],{scale:3,backgroundColor:'#ffffff',windowWidth:900,windowHeight:2500,scrollX:0,scrollY:0});
       if(i)doc.addPage([W,H],'p');
       doc.addImage(c.toDataURL('image/jpeg',.95),'JPEG',0,0,W,H);
     }
-    doc.save('caratula-trasera.pdf');
+    doc.save(m==='cal'?'calibracion.pdf':'caratula-trasera.pdf');
   }catch(e){alert('No se pudo crear el PDF: '+e.message)}
   b.textContent=txt;b.disabled=false;
 };
+$('pdf').onclick=()=>doPdf(undefined,$('pdf'));
 
 /* ---------- proyecto y plantilla ---------- */
 function dl(n,t,m){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:m}));a.download=n;a.click()}
 $('sv').onclick=()=>dl('proyecto-caratula.json',JSON.stringify(S),'application/json');
 $('op').onclick=()=>$('opIn').click();$('tp').onclick=()=>$('tpIn').click();
 const rdTxt=(inp,fn)=>{const f=inp.files[0];inp.value='';if(!f)return;const r=new FileReader();r.onload=()=>{try{fn(r.result)}catch(e){alert(e.message)}};r.readAsText(f)};
-$('opIn').onchange=e=>rdTxt(e.target,t=>{const o=JSON.parse(t);if(!o.tpl||!o.sides)throw new Error('Proyecto no válido');S=Object.assign(fresh(),o);S.print=Object.assign(fresh().print,o.print);sel=null;printUI();card();props();save()});
-$('tpIn').onchange=e=>rdTxt(e.target,t=>{S.tpl=tplFrom(t);card();save()});
+$('opIn').onchange=e=>rdTxt(e.target,t=>{const o=JSON.parse(t);if(!o.tpl||!o.sides)throw new Error('Proyecto no válido');S=Object.assign(fresh(),o);S.print=Object.assign(fresh().print,o.print);sel=null;printUI();card();props();if(calOn)calUI();save()});
+$('tpIn').onchange=e=>rdTxt(e.target,t=>{S.tpl=tplFrom(t);S.tpl0=JSON.parse(JSON.stringify(S.tpl));card();if(calOn)calUI();save()});
 
+/* ---------- modo calibración ---------- */
+const r2=v=>Math.round(v*100)/100;
+const zname=i=>S.tpl.zones.length===3?['Lomo superior','Panel principal','Lomo inferior'][i]:'Zona '+(i+1);
+function setTpl(w,zi,v){
+  const t=S.tpl,Z=t.zones,gaps=Z.map((q,i)=>i?q.y-(Z[i-1].y+Z[i-1].h):q.y);
+  if(w!=null){t.w=w;Z.forEach(q=>q.w=w)}
+  if(zi!=null){Z[zi].h=v;Z.forEach((q,i)=>{if(i)q.y=r2(Z[i-1].y+Z[i-1].h+gaps[i])})}
+  const l=Z[Z.length-1];t.h=r2(l.y+l.h);
+  $('ttot').textContent=`Total: ${t.w} × ${t.h} mm`;card();save();
+}
+const nrow=(lab,val,fn)=>{const l=document.createElement('label');l.className='f';l.innerHTML=`<span>${lab}</span>`;const i=document.createElement('input');i.type='number';i.step=.1;i.value=val;i.oninput=()=>{const v=parseFloat(i.value);if(v>0)fn(v)};l.append(i);return l};
+function calUI(){
+  const R=$('calui'),t=S.tpl,p=S.print,n=()=>0;R.innerHTML='';
+  const B=(txt,fn)=>{const b=document.createElement('button');b.textContent=txt;b.onclick=fn;return b};
+  const H=s=>R.insertAdjacentHTML('beforeend',s);
+  H('<small>Paso 1: mide tu carcasa real y ajusta la plantilla. Paso 2: imprime la hoja de prueba, mírala a contraluz y corrige el desfase entre las dos caras. Paso 3: corrige la escala de la impresora.</small><h4 style="margin:10px 0 6px">1 · Medidas de la plantilla (mm)</h4>');
+  R.append(nrow('Ancho de la tarjeta',t.w,v=>setTpl(v)));
+  t.zones.forEach((q,i)=>R.append(nrow(zname(i)+' · alto',q.h,v=>setTpl(null,i,v))));
+  H('<small id="ttot"></small>');$('ttot').textContent=`Total: ${t.w} × ${t.h} mm`;
+  const b1=document.createElement('div');b1.className='btns';
+  b1.append(B('Restablecer medidas',()=>{S.tpl=S.tpl0?JSON.parse(JSON.stringify(S.tpl0)):tplFrom(DEF);card();save();calUI()}));R.append(b1);
+  H('<h4 style="margin:12px 0 6px">2 · Alineación Cara A / Cara B</h4>');
+  const pb=document.createElement('div');pb.className='btns';
+  pb.append(B('Imprimir hoja de prueba',()=>doPrint('cal')),B('PDF de prueba',function(){doPdf('cal',this)}));R.append(pb);
+  H('<small>Mira la hoja a contraluz por la Cara A: negro = Cara A, rojo = Cara B. Si las cruces rojas quedan a la derecha de las negras, mueve B a la izquierda; si quedan abajo, mueve B hacia arriba. Repite hasta que coincidan. Con volteo por borde corto, comprueba la dirección con la propia hoja de prueba.</small>');
+  const g=document.createElement('div');g.className='g2';
+  g.append(fld(p,'Mover B → derecha (mm)','bx','number',.1,n),fld(p,'Mover B ↓ abajo (mm)','by','number',.1,n));R.append(g);
+  const np=document.createElement('div');np.className='btns';
+  [['←','bx',-.1],['→','bx',.1],['↑','by',-.1],['↓','by',.1]].forEach(([s,k,d])=>np.append(B(s+' 0,1',()=>{p[k]=r2(p[k]+d);save();calUI()})));R.append(np);
+  H('<h4 style="margin:12px 0 6px">3 · Escala de la impresora</h4><small>En la hoja de prueba, mide con una regla la distancia entre las cruces negras de las esquinas (teórica: '+t.w+' × '+t.h+' mm) e introduce lo que mides.</small>');
+  let mw=t.w,mh=t.h;const gm=document.createElement('div');gm.className='g2';
+  gm.append(nrow('Medido ancho',t.w,v=>mw=v),nrow('Medido alto',t.h,v=>mh=v));R.append(gm);
+  const sb=document.createElement('div');sb.className='btns';
+  sb.append(B('Aplicar corrección',()=>{p.sx=r2(p.sx*t.w/mw);p.sy=r2(p.sy*t.h/mh);save();calUI()}),B('Restablecer ajustes',()=>{Object.assign(p,{bx:0,by:0,sx:100,sy:100});save();calUI()}));
+  const g2=document.createElement('div');g2.className='g2';g2.style.marginTop='8px';
+  g2.append(fld(p,'Escala X (%)','sx','number',.05,n),fld(p,'Escala Y (%)','sy','number',.05,n));R.append(g2,sb);
+}
+$('cal').onclick=()=>{calOn=!calOn;$('cal').classList.toggle('on',calOn);$('calbox').style.display=calOn?'block':'none';if(calOn)calUI();card()};
 printUI();setSide('A');
 </script>
 </body>
